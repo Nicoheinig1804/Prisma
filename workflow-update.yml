@@ -1,0 +1,41 @@
+name: Prisma aktualisieren
+
+on:
+  schedule:
+    # Werktags 16:35 UTC = 18:35 Sommerzeit / 17:35 Winterzeit
+    - cron: "35 16 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: prisma-update
+  cancel-in-progress: false
+
+jobs:
+  aktualisieren:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Kurse holen und Daten neu verschlüsseln
+        env:
+          PRISMA_PASSPHRASE: ${{ secrets.PRISMA_PASSPHRASE }}
+        run: node update.mjs
+
+      - name: Änderung einchecken
+        run: |
+          if git diff --quiet -- data.enc.json; then
+            echo "Keine Änderung – nichts einzuchecken."
+            exit 0
+          fi
+          git config user.name  "Prisma"
+          git config user.email "actions@users.noreply.github.com"
+          git add data.enc.json
+          git commit -m "Depotstand $(date -u +%Y-%m-%d)"
+          git push
